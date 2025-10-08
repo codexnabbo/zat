@@ -9,8 +9,8 @@
 * Common options inspired by `cat`:
 
   * `-n` — number all output lines.
-  * `-b` — number non-blank output lines.(not implemented yet)
-  * `-E` — display `$` at the end of each line.(not implemented yet)
+  * `-b` — number non-blank output lines.
+  * `-E` — display `$` at the end of each line.
   * `-T` — display tabs as `^I`.(not implemented yet)
   * `-v` — show non-printable characters in a visible form (partial).(not implemented yet)
 * Unix-friendly behavior: when no file is passed, it reads from stdin.
@@ -39,7 +39,7 @@ zat/
 If the project is organized as a single `src/main.zig`:
 
 ```bash
-zig build -Doptimize=ReleaseFast --summary all
+zig build --summary all
 ```
 
 This generates the executable `zat` under the zig-out/bin/ directory.

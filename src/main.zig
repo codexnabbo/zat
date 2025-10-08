@@ -7,12 +7,14 @@ const SelectedFlags = struct {
     numberNonBlack: bool,
     numberAll: bool,
     numberCount: usize = 0,
+    displayDollar: bool = false,
 
     pub fn init() SelectedFlags {
         return .{
             .numberAll = false,
             .numberCount = 1,
             .numberNonBlack = false,
+            .displayDollar = false,
         };
     }
 };
@@ -49,39 +51,91 @@ pub fn main() !void {
             flags.numberAll = true;
             continue;
         }
-        const file = std.fs.cwd().openFile(value, .{ .mode = .read_only }) catch |err| switch (err) {
-            error.FileNotFound => {
-                try out.writeAll("File Not Found\n");
-                try out.flush();
-                std.posix.exit(1);
-                unreachable;
-            },
-            else => {
-                try out.writeAll("File Not Found\n");
-                try out.flush();
-                std.posix.exit(1);
-                unreachable;
-            },
+        if (std.mem.eql(u8, value, "-b")) {
+            flags.numberNonBlack = true;
+            flags.numberAll = false;
+            continue;
+        }
+        if (std.mem.eql(u8, value, "-E")) {
+            flags.displayDollar = true;
+            continue;
+        }
+        const file = std.fs.cwd().openFile(value, .{ .mode = .read_only }) catch {
+            try out.writeAll("zat: ");
+            try out.writeAll(value);
+            try out.writeAll(": No such file or directory\n");
+            try out.flush();
+            std.posix.exit(1);
+            unreachable;
         };
         defer file.close();
 
         var buf_file: [1024]u8 = undefined;
         var reader = file.reader(&buf_file);
-        while (reader.interface.takeDelimiterInclusive('\n')) |line| {
+
+        const page_alloc = std.heap.page_allocator;
+
+        var allocating_writer = std.Io.Writer.Allocating.init(page_alloc);
+
+        while (reader.interface.streamDelimiter(&allocating_writer.writer, '\n')) |_| {
+            const line = allocating_writer.written();
             if (flags.numberAll) {
                 const space = switch (flags.numberCount) {
                     0...9 => "     ",
                     10...99 => "    ",
                     100...999 => "   ",
+                    1000...99999 => "  ",
                     else => "  ",
                 };
-                try out.print("{s}{d}  {s}", .{ space, flags.numberCount, line });
+                try out.print("{s}{d}  {s}{s}\n", .{ space, flags.numberCount, line, if (flags.displayDollar) "$" else "" });
                 flags.numberCount += 1;
                 try out.flush();
+                allocating_writer.clearRetainingCapacity();
+                reader.interface.toss(1);
+                continue;
+            }
+
+            if (flags.numberNonBlack) {
+                const space = switch (flags.numberCount) {
+                    0...9 => "     ",
+                    10...99 => "    ",
+                    100...999 => "   ",
+                    1000...99999 => "  ",
+                    else => " ",
+                };
+                const number_space = switch (flags.numberCount) {
+                    0...9 => " ",
+                    10...99 => "  ",
+                    100...999 => "   ",
+                    1000...9999 => "    ",
+                    else => "     ",
+                };
+
+                var is_blanck = true;
+                for (line) |c| {
+                    switch (c) {
+                        '\r', '\n' => {},
+                        else => is_blanck = false,
+                    }
+                }
+
+                if (is_blanck) {
+                    try out.print("{s}{s}  {s}{s}\n", .{ space, number_space, line, if (flags.displayDollar) "$" else "" });
+                } else {
+                    try out.print("{s}{d}  {s}{s}\n", .{ space, flags.numberCount, line, if (flags.displayDollar) "$" else "" });
+                    flags.numberCount += 1;
+                }
+                try out.flush();
+                allocating_writer.clearRetainingCapacity();
+                reader.interface.toss(1);
                 continue;
             }
             try out.writeAll(line);
+            if (flags.displayDollar) try out.writeAll("$");
+            try out.writeAll("\n");
             try out.flush();
+            allocating_writer.clearRetainingCapacity();
+            reader.interface.toss(1);
         } else |err| {
             if (err != error.EndOfStream) return err;
         }
