@@ -19,6 +19,38 @@ const SelectedFlags = struct {
     }
 };
 
+fn printHelp() void {
+    const help_text =
+        \\zat - A Zig implementation of the cat command
+        \\
+        \\USAGE:
+        \\    zat [OPTIONS] [FILE]...
+        \\
+        \\OPTIONS:
+        \\    -n              Number all output lines
+        \\    -b              Number non-blank output lines  
+        \\    -E              Display $ at the end of each line
+        \\    -h, --help      Show this help message and exit
+        \\    --version       Show version information and exit
+        \\
+        \\EXAMPLES:
+        \\    zat file.txt              Print file contents
+        \\    zat -n file.txt           Print with line numbers
+        \\    zat -b file.txt           Number non-blank lines
+        \\    zat -E file.txt           Show line endings
+        \\    zat file1.txt file2.txt   Concatenate multiple files
+        \\    echo "hello" | zat        Read from stdin
+        \\
+        \\If no files are specified, zat reads from standard input.
+        \\
+    ;
+    std.debug.print("{s}", .{help_text});
+}
+
+fn printVersion() void {
+    std.debug.print("zat version 1.0.0\n", .{});
+}
+
 pub fn main() !void {
     var buf_in: [64 * 1024]u8 = undefined;
     var buf_out: [64 * 1024]u8 = undefined;
@@ -47,6 +79,14 @@ pub fn main() !void {
     }
 
     for (args[1..]) |value| {
+        if (std.mem.eql(u8, value, "-h") or std.mem.eql(u8, value, "--help")) {
+            printHelp();
+            std.posix.exit(0);
+        }
+        if (std.mem.eql(u8, value, "--version")) {
+            printVersion();
+            std.posix.exit(0);
+        }
         if (std.mem.eql(u8, value, "-n")) {
             flags.numberAll = true;
             continue;
